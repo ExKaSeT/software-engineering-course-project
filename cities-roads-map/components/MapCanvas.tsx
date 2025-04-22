@@ -18,8 +18,8 @@ import { Caretaker, Memento, FlowState } from '@/utils/memento';
 import { genCityName } from '@/utils/nameGenerator';
 
 export default function MapCanvas() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const caretakerRef = useRef(new Caretaker());
 
   // Initialize history on mount

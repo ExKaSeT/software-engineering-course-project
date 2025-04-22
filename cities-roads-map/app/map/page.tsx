@@ -1,10 +1,5 @@
 'use client';
-import dynamic from 'next/dynamic';
-
-const MapCanvas = dynamic(
-  () => import('@/components/MapCanvas'),
-  { ssr: false }
-);
+import MapCanvas from "@/components/MapCanvas";
 
 export default function MapPage() {
   return <MapCanvas />;
