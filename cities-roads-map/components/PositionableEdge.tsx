@@ -35,7 +35,7 @@ const PositionableEdge: FC<EdgeProps> = ({
   const handlers = (data as any)?.positionHandlers as Handler[] || [];
   const type = (data as any)?.type as string || 'bezier';
   const segmentCount = handlers.length + 1;
-  const segments: { path: string }[] = [];
+  const segments: { path: string; labelX: number; labelY: number }[] = [];
 
   const getPathFn = () => {
     switch (type) {
@@ -49,18 +49,24 @@ const PositionableEdge: FC<EdgeProps> = ({
   };
   const pathFn = getPathFn();
 
-  // build segments
+  // build segments and capture label points
   for (let i = 0; i < segmentCount; i++) {
     const sX = i === 0 ? sourceX : handlers[i - 1].x;
     const sY = i === 0 ? sourceY : handlers[i - 1].y;
     const tX = i === segmentCount - 1 ? targetX : handlers[i].x;
     const tY = i === segmentCount - 1 ? targetY : handlers[i].y;
-    const [d] = pathFn({ sourceX: sX, sourceY: sY, sourcePosition, targetX: tX, targetY: tY, targetPosition });
-    segments.push({ path: d });
+    const [d, lx, ly] = pathFn({ sourceX: sX, sourceY: sY, sourcePosition, targetX: tX, targetY: tY, targetPosition });
+    segments.push({ path: d, labelX: lx, labelY: ly });
   }
 
+  // midpoint for label
+  const midIndex = Math.floor(segments.length / 2);
+  const labelX = segments[midIndex]?.labelX ?? 0;
+  const labelY = segments[midIndex]?.labelY ?? 0;
+  const cost = (data as any)?.cost;
+
+  // enable dragging handlers only when mouse is down
   const startDrag = (handlerIdx: number) => {
-    // activate this handler
     rf.setEdges(eds =>
       eds.map(edge => {
         if (edge.id === id) {
@@ -80,7 +86,7 @@ const PositionableEdge: FC<EdgeProps> = ({
       rf.setEdges(eds =>
         eds.map(edge => {
           if (edge.id === id) {
-            const ph = (edge.data as any).positionHandlers.slice();
+            const ph = [...(edge.data as any).positionHandlers];
             const idx = ph.findIndex((h: Handler) => h.active);
             if (idx >= 0) ph[idx] = { x: pos.x, y: pos.y, active: true };
             return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
@@ -89,6 +95,7 @@ const PositionableEdge: FC<EdgeProps> = ({
         })
       );
     };
+
     const onUp = () => {
       rf.setEdges(eds =>
         eds.map(edge => {
@@ -102,6 +109,7 @@ const PositionableEdge: FC<EdgeProps> = ({
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
+
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   };
@@ -116,7 +124,7 @@ const PositionableEdge: FC<EdgeProps> = ({
           style={ style }
           markerEnd={ markerEnd }
           markerStart={ markerStart }
-          onClick={ e => {
+          onClick={ (e) => {
             const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
             rf.setEdges(eds =>
               eds.map(edge => {
@@ -131,6 +139,23 @@ const PositionableEdge: FC<EdgeProps> = ({
           } }
         />
       )) }
+
+      {/* render cost label at midpoint of edge */ }
+      { cost !== undefined && (
+        <EdgeLabelRenderer>
+          <div
+            className="px-1 py-0.5 bg-white rounded border shadow-subtle text-sm"
+            style={ {
+              position: 'absolute',
+              transform: `translate(${ labelX }px, ${ labelY }px) translate(-50%, -150%)`,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            } }
+          >
+            { cost }
+          </div>
+        </EdgeLabelRenderer>
+      ) }
 
       { handlers.map((h, i) => (
         <EdgeLabelRenderer key={ `${ id }-handler-${ i }` }>

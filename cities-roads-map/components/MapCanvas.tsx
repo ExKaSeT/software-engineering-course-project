@@ -16,7 +16,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import Header from '@/components/Header';
-import PositionableEdge from '@/components/edges/PositionableEdge';
+import PositionableEdge from '@/components/PositionableEdge';
 import { Caretaker, Memento, FlowState } from '@/utils/memento';
 import { genCityName } from '@/utils/nameGenerator';
 
@@ -50,10 +50,8 @@ export default function MapCanvas() {
   const handleDelete = useCallback(() => {
     const delNodeIds = new Set(nodes.filter(n => n.selected).map(n => n.id));
     const delEdgeIds = new Set(edges.filter(e => e.selected).map(e => e.id));
-
     const nextNodes = nodes.filter(n => !delNodeIds.has(n.id));
     const nextEdges = edges.filter(e => !delEdgeIds.has(e.id));
-
     setNodes(nextNodes);
     setEdges(nextEdges);
     caretakerRef.current.save({ nodes: nextNodes, edges: nextEdges });
@@ -109,6 +107,21 @@ export default function MapCanvas() {
     caretakerRef.current.save({ nodes, edges: nextEdges });
   }, [nodes, edges, setEdges]);
 
+  const handleEdgeContextMenu = useCallback((e: React.MouseEvent, edge: Edge) => {
+    e.preventDefault();
+    const newCost = prompt('New road cost:', edge.label as string)?.trim();
+    if (!newCost || newCost === edge.label) return;
+    setEdges((eds) => {
+      const updated = eds.map((e2) => e2.id === edge.id ? {
+        ...e2,
+        label: newCost,
+        data: { ...(e2.data as any), cost: Number(newCost) }
+      } : e2);
+      caretakerRef.current.save({ nodes, edges: updated });
+      return updated;
+    });
+  }, [nodes, edges]);
+
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
     const newName = prompt('New city name:', node.data.label as string)?.trim();
     if (!newName || newName === node.data.label) return;
@@ -124,32 +137,32 @@ export default function MapCanvas() {
   const onEdgeDoubleClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     const newCost = prompt('New road cost:', edge.label as string)?.trim();
     if (!newCost || newCost === edge.label) return;
-    const nextEdges = edges.map(e => e.id === edge.id ? {
-      ...e,
+    const nextEdges = edges.map(e2 => e2.id === edge.id ? {
+      ...e2,
       label: newCost,
-      data: { ...(e.data as any), cost: Number(newCost) }
-    } : e);
+      data: { ...(e2.data as any), cost: Number(newCost) }
+    } : e2);
     setEdges(nextEdges);
     caretakerRef.current.save({ nodes, edges: nextEdges });
   }, [nodes, edges, setEdges]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    const handler = (evt: KeyboardEvent) => {
+      if ((evt.ctrlKey || evt.metaKey) && evt.key === 'z') {
         const prev = caretakerRef.current.undo();
         if (prev) {
           setNodes(prev.nodes);
           setEdges(prev.edges);
         }
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      if ((evt.ctrlKey || evt.metaKey) && evt.key === 'y') {
         const next = caretakerRef.current.redo();
         if (next) {
           setNodes(next.nodes);
           setEdges(next.edges);
         }
       }
-      if (e.key === 'Delete') handleDelete();
+      if (evt.key === 'Delete') handleDelete();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -157,13 +170,8 @@ export default function MapCanvas() {
 
   return (
     <div className="w-screen h-screen bg-neutral-50">
-      <Header
-        onExport={ handleExport }
-        onImport={ handleImport }
-        onAddCity={ handleAddCity }
-        onDelete={ handleDelete }
-      />
-
+      <Header onExport={ handleExport } onImport={ handleImport } onAddCity={ handleAddCity }
+              onDelete={ handleDelete }/>
       <div className="pt-16 w-full h-[calc(100vh-4rem)]">
         <ReactFlow
           nodes={ nodes }
@@ -173,6 +181,7 @@ export default function MapCanvas() {
           onConnect={ onConnect }
           onNodeDoubleClick={ onNodeDoubleClick }
           onEdgeDoubleClick={ onEdgeDoubleClick }
+          onEdgeContextMenu={ handleEdgeContextMenu }
           edgeTypes={ edgeTypes }
           fitView
         >
