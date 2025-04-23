@@ -19,31 +19,29 @@ const ClickableBaseEdge: React.FC<ClickableBaseEdgeProps> = ({
                                                                markerStart,
                                                                interactionWidth = 20,
                                                                onClick,
-                                                             }) => {
-  return (
-    <>
+                                                             }) => (
+  <>
+    <path
+      id={id}
+      style={style}
+      d={path}
+      fill="none"
+      className="react-flow__edge-path"
+      markerEnd={markerEnd}
+      markerStart={markerStart}
+    />
+    {interactionWidth > 0 && (
       <path
-        id={id}
-        style={style}
         d={path}
         fill="none"
-        className="react-flow__edge-path"
-        markerEnd={markerEnd}
-        markerStart={markerStart}
+        strokeOpacity={0}
+        strokeWidth={interactionWidth}
+        className="react-flow__edge-interaction"
+        onClick={onClick}
       />
-      {interactionWidth > 0 && (
-        <path
-          d={path}
-          fill="none"
-          strokeOpacity={0}
-          strokeWidth={interactionWidth}
-          className="react-flow__edge-interaction"
-          onClick={onClick}
-        />
-      )}
-    </>
-  );
-};
+    )}
+  </>
+);
 
 ClickableBaseEdge.displayName = 'BaseEdge';
 export default ClickableBaseEdge;

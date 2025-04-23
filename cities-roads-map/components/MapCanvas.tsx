@@ -1,12 +1,7 @@
-// components/MapCanvas.tsx
 'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  ChangeEvent,
-  useRef,
-} from 'react';
+import React, { useCallback, useEffect, ChangeEvent, useRef } from 'react';
+import type { EdgeTypes } from '@xyflow/react';
 import {
   ReactFlow,
   addEdge,
@@ -16,8 +11,7 @@ import {
   Controls,
   Node,
   Edge,
-  Connection,
-  EdgeTypes,
+  Connection
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -35,30 +29,24 @@ export default function MapCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const caretakerRef = useRef(new Caretaker());
 
-  // Инициализация истории единожды
   useEffect(() => {
     caretakerRef.current.save({ nodes, edges });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Добавление города
   const handleAddCity = useCallback(() => {
     const id = Date.now().toString();
     const name = genCityName(nodes);
     const newNode: Node = {
       id,
       data: { label: name },
-      position: {
-        x: 50 + Math.random() * 400,
-        y: 50 + Math.random() * 400,
-      },
+      position: { x: 50 + Math.random() * 400, y: 50 + Math.random() * 400 }
     };
     const nextNodes = [...nodes, newNode];
     setNodes(nextNodes);
     caretakerRef.current.save({ nodes: nextNodes, edges });
   }, [nodes, edges, setNodes]);
 
-  // Удаление всех выбранных нод и рёбер
   const handleDelete = useCallback(() => {
     const delNodeIds = new Set(nodes.filter(n => n.selected).map(n => n.id));
     const delEdgeIds = new Set(edges.filter(e => e.selected).map(e => e.id));
@@ -71,13 +59,12 @@ export default function MapCanvas() {
     caretakerRef.current.save({ nodes: nextNodes, edges: nextEdges });
   }, [nodes, edges, setNodes, setEdges]);
 
-  // Экспорт
   const handleExport = useCallback(() => {
     const payload = {
       nodes,
       edges,
       history: caretakerRef.current.mementos.map((m: Memento) => m.getState()),
-      index: caretakerRef.current.index,
+      index: caretakerRef.current.index
     };
     const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -88,7 +75,6 @@ export default function MapCanvas() {
     URL.revokeObjectURL(url);
   }, [nodes, edges]);
 
-  // Импорт
   const handleImport = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,7 +94,6 @@ export default function MapCanvas() {
     e.target.value = '';
   }, [setNodes, setEdges]);
 
-  // Добавление дороги с positionable edge
   const onConnect = useCallback((params: Connection) => {
     const cost = prompt('Enter road cost:', '1');
     if (cost == null) return;
@@ -117,17 +102,13 @@ export default function MapCanvas() {
       id: `${ params.source }-${ params.target }-${ Date.now() }`,
       type: 'positionable',
       label: cost,
-      data: {
-        cost: Number(cost),
-        positionHandlers: [] as { x: number; y: number }[],
-      },
+      data: { cost: Number(cost), positionHandlers: [] }
     };
     const nextEdges = addEdge(newEdge, edges);
     setEdges(nextEdges);
     caretakerRef.current.save({ nodes, edges: nextEdges });
   }, [nodes, edges, setEdges]);
 
-  // Переименование города
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
     const newName = prompt('New city name:', node.data.label as string)?.trim();
     if (!newName || newName === node.data.label) return;
@@ -135,27 +116,23 @@ export default function MapCanvas() {
       alert('Name must be unique');
       return;
     }
-    const nextNodes = nodes.map(n =>
-      n.id === node.id ? { ...n, data: { ...n.data, label: newName } } : n
-    );
+    const nextNodes = nodes.map(n => n.id === node.id ? { ...n, data: { ...n.data, label: newName } } : n);
     setNodes(nextNodes);
     caretakerRef.current.save({ nodes: nextNodes, edges });
   }, [nodes, edges, setNodes]);
 
-  // Изменение стоимости дороги
   const onEdgeDoubleClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     const newCost = prompt('New road cost:', edge.label as string)?.trim();
     if (!newCost || newCost === edge.label) return;
-    const nextEdges = edges.map(e =>
-      e.id === edge.id
-        ? { ...e, label: newCost, data: { ...e.data, cost: Number(newCost) } }
-        : e
-    );
+    const nextEdges = edges.map(e => e.id === edge.id ? {
+      ...e,
+      label: newCost,
+      data: { ...(e.data as any), cost: Number(newCost) }
+    } : e);
     setEdges(nextEdges);
     caretakerRef.current.save({ nodes, edges: nextEdges });
   }, [nodes, edges, setEdges]);
 
-  // Обработка клавиш: undo/redo/delete
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
@@ -172,9 +149,7 @@ export default function MapCanvas() {
           setEdges(next.edges);
         }
       }
-      if (e.key === 'Delete') {
-        handleDelete();
-      }
+      if (e.key === 'Delete') handleDelete();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
