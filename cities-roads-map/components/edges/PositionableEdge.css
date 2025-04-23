@@ -1,0 +1,20 @@
+.positionHandlerContainer {
+  position: absolute;
+  pointer-events: all;
+}
+.positionHandlerEventContainer {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.positionHandler {
+  width: 10px;
+  height: 10px;
+  background: #fff319;
+  border: 1px solid #ddd41d;
+  cursor: pointer;
+  border-radius: 50%;
+}

@@ -1,3 +1,4 @@
+// components/MapCanvas.tsx
 'use client';
 
 import React, {
@@ -16,12 +17,18 @@ import {
   Node,
   Edge,
   Connection,
+  EdgeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import Header from '@/components/Header';
+import PositionableEdge from '@/components/edges/PositionableEdge';
 import { Caretaker, Memento, FlowState } from '@/utils/memento';
 import { genCityName } from '@/utils/nameGenerator';
+
+const edgeTypes: EdgeTypes = {
+  positionable: PositionableEdge,
+};
 
 export default function MapCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -31,6 +38,7 @@ export default function MapCanvas() {
   // Инициализация истории единожды
   useEffect(() => {
     caretakerRef.current.save({ nodes, edges });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Добавление города
@@ -100,15 +108,19 @@ export default function MapCanvas() {
     e.target.value = '';
   }, [setNodes, setEdges]);
 
-  // Добавление дороги
+  // Добавление дороги с positionable edge
   const onConnect = useCallback((params: Connection) => {
     const cost = prompt('Enter road cost:', '1');
     if (cost == null) return;
     const newEdge: Edge = {
       ...params,
       id: `${ params.source }-${ params.target }-${ Date.now() }`,
+      type: 'positionable',
       label: cost,
-      data: { cost: Number(cost) },
+      data: {
+        cost: Number(cost),
+        positionHandlers: [] as { x: number; y: number }[],
+      },
     };
     const nextEdges = addEdge(newEdge, edges);
     setEdges(nextEdges);
@@ -135,7 +147,9 @@ export default function MapCanvas() {
     const newCost = prompt('New road cost:', edge.label as string)?.trim();
     if (!newCost || newCost === edge.label) return;
     const nextEdges = edges.map(e =>
-      e.id === edge.id ? { ...e, label: newCost, data: { cost: Number(newCost) } } : e
+      e.id === edge.id
+        ? { ...e, label: newCost, data: { ...e.data, cost: Number(newCost) } }
+        : e
     );
     setEdges(nextEdges);
     caretakerRef.current.save({ nodes, edges: nextEdges });
@@ -167,7 +181,7 @@ export default function MapCanvas() {
   }, [handleDelete, setNodes, setEdges]);
 
   return (
-    <div className="w-screen h-screen">
+    <div className="w-screen h-screen bg-neutral-50">
       <Header
         onExport={ handleExport }
         onImport={ handleImport }
@@ -175,7 +189,7 @@ export default function MapCanvas() {
         onDelete={ handleDelete }
       />
 
-      <div className="pt-16 w-full h-[calc(100vh-4rem)] bg-neutral-50">
+      <div className="pt-16 w-full h-[calc(100vh-4rem)]">
         <ReactFlow
           nodes={ nodes }
           edges={ edges }
@@ -184,6 +198,7 @@ export default function MapCanvas() {
           onConnect={ onConnect }
           onNodeDoubleClick={ onNodeDoubleClick }
           onEdgeDoubleClick={ onEdgeDoubleClick }
+          edgeTypes={ edgeTypes }
           fitView
         >
           <Background/>
