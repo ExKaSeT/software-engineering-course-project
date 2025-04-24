@@ -20,6 +20,7 @@ interface Handler {
 
 const PositionableEdge: FC<EdgeProps> = ({
                                            id,
+                                           selected,
                                            sourceX,
                                            sourceY,
                                            targetX,
@@ -35,9 +36,15 @@ const PositionableEdge: FC<EdgeProps> = ({
   const handlers = (data as any)?.positionHandlers as Handler[] || [];
   const type = (data as any)?.type as string || 'bezier';
   const cost = (data as any)?.cost;
-  const segmentCount = handlers.length + 1;
 
-  // Собираем сегменты и точки для лейблов
+  // Цвета и толщина: невыделенная дорожка берёт цвет выделенной, а при selected утолщаем
+  const strokeColor = '#3A3A3C';
+  const strokeWidthDefault = 1.5;
+  const strokeWidthSelected = 2;
+  const strokeWidth = selected ? strokeWidthSelected : strokeWidthDefault;
+
+  // Собираем сегменты
+  const segmentCount = handlers.length + 1;
   const segments: { path: string; labelX: number; labelY: number }[] = [];
   const pathFn = type === 'straight'
     ? getStraightPath
@@ -50,17 +57,15 @@ const PositionableEdge: FC<EdgeProps> = ({
     const sY = i === 0 ? sourceY : handlers[i - 1].y;
     const tX = i === segmentCount - 1 ? targetX : handlers[i].x;
     const tY = i === segmentCount - 1 ? targetY : handlers[i].y;
-    const [d, lx, ly] = pathFn({
-      sourceX: sX,
-      sourceY: sY,
-      sourcePosition,
-      targetX: tX,
-      targetY: tY,
-      targetPosition,
-    });
+    const [d, lx, ly] = pathFn({ sourceX: sX, sourceY: sY, sourcePosition, targetX: tX, targetY: tY, targetPosition });
     segments.push({ path: d, labelX: lx, labelY: ly });
   }
 
+  // midpoint for cost label
+  const mid = Math.floor(segments.length / 2);
+  const labelPos = segments[mid] || { labelX: 0, labelY: 0 };
+
+  // Drag handlers
   const startDrag = (handlerIdx: number) => {
     rf.setEdges(eds =>
       eds.map(edge => {
@@ -112,10 +117,6 @@ const PositionableEdge: FC<EdgeProps> = ({
     window.addEventListener('mouseup', onUp);
   };
 
-  // Вычисляем середину для лейбла стоимости
-  const mid = Math.floor(segments.length / 2);
-  const label = segments[mid] ?? { labelX: 0, labelY: 0 };
-
   return (
     <>
       { segments.map((seg, idx) => (
@@ -123,7 +124,7 @@ const PositionableEdge: FC<EdgeProps> = ({
           key={ `${ id }-seg-${ idx }` }
           id={ `${ id }-seg-${ idx }` }
           path={ seg.path }
-          style={ style }
+          style={ { ...style, stroke: strokeColor, strokeWidth } }
           markerEnd={ markerEnd }
           markerStart={ markerStart }
           onContextMenu={ (e) => {
@@ -150,7 +151,7 @@ const PositionableEdge: FC<EdgeProps> = ({
             className="px-1 py-0.5 bg-white rounded border shadow-subtle text-sm"
             style={ {
               position: 'absolute',
-              transform: `translate(${ label.labelX }px, ${ label.labelY }px) translate(-50%, -150%)`,
+              transform: `translate(${ labelPos.labelX }px, ${ labelPos.labelY }px) translate(-50%, -150%)`,
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
             } }
@@ -180,7 +181,7 @@ const PositionableEdge: FC<EdgeProps> = ({
                     return {
                       ...edge,
                       id: `${ id }-${ Date.now() }`,
-                      data: { ...(edge.data as any), positionHandlers: ph }
+                      data: { ...(edge.data as any), positionHandlers: ph },
                     };
                   }
                   return edge;
