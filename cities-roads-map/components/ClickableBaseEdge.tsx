@@ -9,6 +9,7 @@ interface ClickableBaseEdgeProps {
   markerStart?: string;
   interactionWidth?: number;
   onClick?: (event: React.MouseEvent<SVGPathElement, MouseEvent>) => void;
+  onContextMenu?: (event: React.MouseEvent<SVGPathElement, MouseEvent>) => void;
 }
 
 const ClickableBaseEdge: React.FC<ClickableBaseEdgeProps> = ({
@@ -19,6 +20,7 @@ const ClickableBaseEdge: React.FC<ClickableBaseEdgeProps> = ({
                                                                markerStart,
                                                                interactionWidth = 20,
                                                                onClick,
+                                                               onContextMenu,
                                                              }) => {
   return (
     <>
@@ -39,6 +41,7 @@ const ClickableBaseEdge: React.FC<ClickableBaseEdgeProps> = ({
           strokeWidth={ interactionWidth }
           className="react-flow__edge-interaction"
           onClick={ onClick }
+          onContextMenu={ onContextMenu }
         />
       ) }
     </>

@@ -34,48 +34,43 @@ const PositionableEdge: FC<EdgeProps> = ({
   const rf = useReactFlow();
   const handlers = (data as any)?.positionHandlers as Handler[] || [];
   const type = (data as any)?.type as string || 'bezier';
+  const cost = (data as any)?.cost;
   const segmentCount = handlers.length + 1;
+
+  // Собираем сегменты и точки для лейблов
   const segments: { path: string; labelX: number; labelY: number }[] = [];
+  const pathFn = type === 'straight'
+    ? getStraightPath
+    : type === 'smoothstep'
+      ? getSmoothStepPath
+      : getBezierPath;
 
-  const getPathFn = () => {
-    switch (type) {
-      case 'straight':
-        return getStraightPath;
-      case 'smoothstep':
-        return getSmoothStepPath;
-      default:
-        return getBezierPath;
-    }
-  };
-  const pathFn = getPathFn();
-
-  // build segments and capture label points
   for (let i = 0; i < segmentCount; i++) {
     const sX = i === 0 ? sourceX : handlers[i - 1].x;
     const sY = i === 0 ? sourceY : handlers[i - 1].y;
     const tX = i === segmentCount - 1 ? targetX : handlers[i].x;
     const tY = i === segmentCount - 1 ? targetY : handlers[i].y;
-    const [d, lx, ly] = pathFn({ sourceX: sX, sourceY: sY, sourcePosition, targetX: tX, targetY: tY, targetPosition });
+    const [d, lx, ly] = pathFn({
+      sourceX: sX,
+      sourceY: sY,
+      sourcePosition,
+      targetX: tX,
+      targetY: tY,
+      targetPosition,
+    });
     segments.push({ path: d, labelX: lx, labelY: ly });
   }
 
-  // midpoint for label
-  const midIndex = Math.floor(segments.length / 2);
-  const labelX = segments[midIndex]?.labelX ?? 0;
-  const labelY = segments[midIndex]?.labelY ?? 0;
-  const cost = (data as any)?.cost;
-
-  // enable dragging handlers only when mouse is down
   const startDrag = (handlerIdx: number) => {
     rf.setEdges(eds =>
       eds.map(edge => {
         if (edge.id === id) {
-          const ph = (edge.data as any).positionHandlers.map((hh: Handler, idx: number) => ({
+          const newPh = (edge.data as any).positionHandlers.map((hh: Handler, idx: number) => ({
             x: hh.x,
             y: hh.y,
-            active: idx === handlerIdx
+            active: idx === handlerIdx,
           }));
-          return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
+          return { ...edge, data: { ...(edge.data as any), positionHandlers: newPh } };
         }
         return edge;
       })
@@ -100,7 +95,10 @@ const PositionableEdge: FC<EdgeProps> = ({
       rf.setEdges(eds =>
         eds.map(edge => {
           if (edge.id === id) {
-            const ph = (edge.data as any).positionHandlers.map((hh: Handler) => ({ x: hh.x, y: hh.y }));
+            const ph = (edge.data as any).positionHandlers.map((hh: Handler) => ({
+              x: hh.x,
+              y: hh.y,
+            }));
             return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
           }
           return edge;
@@ -114,6 +112,10 @@ const PositionableEdge: FC<EdgeProps> = ({
     window.addEventListener('mouseup', onUp);
   };
 
+  // Вычисляем середину для лейбла стоимости
+  const mid = Math.floor(segments.length / 2);
+  const label = segments[mid] ?? { labelX: 0, labelY: 0 };
+
   return (
     <>
       { segments.map((seg, idx) => (
@@ -124,7 +126,8 @@ const PositionableEdge: FC<EdgeProps> = ({
           style={ style }
           markerEnd={ markerEnd }
           markerStart={ markerStart }
-          onClick={ (e) => {
+          onContextMenu={ (e) => {
+            e.preventDefault();
             const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
             rf.setEdges(eds =>
               eds.map(edge => {
@@ -147,7 +150,7 @@ const PositionableEdge: FC<EdgeProps> = ({
             className="px-1 py-0.5 bg-white rounded border shadow-subtle text-sm"
             style={ {
               position: 'absolute',
-              transform: `translate(${ labelX }px, ${ labelY }px) translate(-50%, -150%)`,
+              transform: `translate(${ label.labelX }px, ${ label.labelY }px) translate(-50%, -150%)`,
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
             } }

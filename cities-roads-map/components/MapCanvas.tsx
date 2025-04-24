@@ -107,21 +107,6 @@ export default function MapCanvas() {
     caretakerRef.current.save({ nodes, edges: nextEdges });
   }, [nodes, edges, setEdges]);
 
-  const handleEdgeContextMenu = useCallback((e: React.MouseEvent, edge: Edge) => {
-    e.preventDefault();
-    const newCost = prompt('New road cost:', edge.label as string)?.trim();
-    if (!newCost || newCost === edge.label) return;
-    setEdges((eds) => {
-      const updated = eds.map((e2) => e2.id === edge.id ? {
-        ...e2,
-        label: newCost,
-        data: { ...(e2.data as any), cost: Number(newCost) }
-      } : e2);
-      caretakerRef.current.save({ nodes, edges: updated });
-      return updated;
-    });
-  }, [nodes, edges]);
-
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
     const newName = prompt('New city name:', node.data.label as string)?.trim();
     if (!newName || newName === node.data.label) return;
@@ -181,7 +166,6 @@ export default function MapCanvas() {
           onConnect={ onConnect }
           onNodeDoubleClick={ onNodeDoubleClick }
           onEdgeDoubleClick={ onEdgeDoubleClick }
-          onEdgeContextMenu={ handleEdgeContextMenu }
           edgeTypes={ edgeTypes }
           fitView
         >
