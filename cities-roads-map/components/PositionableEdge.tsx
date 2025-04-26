@@ -8,6 +8,7 @@ import {
   getSmoothStepPath,
   getStraightPath,
   useReactFlow,
+  Position,
 } from '@xyflow/react';
 import ClickableBaseEdge from './ClickableBaseEdge';
 import './PositionableEdge.css';
@@ -16,6 +17,20 @@ interface Handler {
   x: number;
   y: number;
   active?: boolean;
+}
+
+// Вычисляем направление сегмента по вектору от src к tgt
+function getSegmentPosition(
+  src: { x: number; y: number },
+  tgt: { x: number; y: number }
+): Position {
+  const dx = tgt.x - src.x;
+  const dy = tgt.y - src.y;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? Position.Right : Position.Left;
+  } else {
+    return dy > 0 ? Position.Bottom : Position.Top;
+  }
 }
 
 const PositionableEdge: FC<EdgeProps> = ({
@@ -37,33 +52,54 @@ const PositionableEdge: FC<EdgeProps> = ({
   const type = (data as any)?.type as string || 'bezier';
   const cost = (data as any)?.cost;
 
-  // Цвета и толщина: невыделенная дорожка берёт цвет выделенной, а при selected утолщаем
+  // Цвет и толщина линий
   const strokeColor = '#3A3A3C';
-  const strokeWidthDefault = 1.5;
-  const strokeWidthSelected = 2;
-  const strokeWidth = selected ? strokeWidthSelected : strokeWidthDefault;
+  const strokeWidth = selected ? 2 : 1;
 
-  // Собираем сегменты
-  const segmentCount = handlers.length + 1;
+  // Подбираем функцию построения пути
+  const pathFn =
+    type === 'straight'
+      ? getStraightPath
+      : type === 'smoothstep'
+        ? getSmoothStepPath
+        : getBezierPath;
+
+  // Собираем все сегменты, вычисляя для каждого свои позиции
   const segments: { path: string; labelX: number; labelY: number }[] = [];
-  const pathFn = type === 'straight'
-    ? getStraightPath
-    : type === 'smoothstep'
-      ? getSmoothStepPath
-      : getBezierPath;
-
+  const segmentCount = handlers.length + 1;
   for (let i = 0; i < segmentCount; i++) {
-    const sX = i === 0 ? sourceX : handlers[i - 1].x;
-    const sY = i === 0 ? sourceY : handlers[i - 1].y;
-    const tX = i === segmentCount - 1 ? targetX : handlers[i].x;
-    const tY = i === segmentCount - 1 ? targetY : handlers[i].y;
-    const [d, lx, ly] = pathFn({ sourceX: sX, sourceY: sY, sourcePosition, targetX: tX, targetY: tY, targetPosition });
+    const prev = i === 0
+      ? { x: sourceX, y: sourceY }
+      : { x: handlers[i - 1].x, y: handlers[i - 1].y };
+    const next = i === segmentCount - 1
+      ? { x: targetX, y: targetY }
+      : { x: handlers[i].x, y: handlers[i].y };
+
+    const segSourcePos =
+      i === 0
+        ? sourcePosition
+        : getSegmentPosition(prev, next);
+
+    const segTargetPos =
+      i === segmentCount - 1
+        ? targetPosition
+        : getSegmentPosition(next, prev);
+
+    const [d, lx, ly] = pathFn({
+      sourceX: prev.x,
+      sourceY: prev.y,
+      sourcePosition: segSourcePos,
+      targetX: next.x,
+      targetY: next.y,
+      targetPosition: segTargetPos,
+    });
+
     segments.push({ path: d, labelX: lx, labelY: ly });
   }
 
-  // midpoint for cost label
+  // Позиция для лейбла цены — середина всего пути
   const mid = Math.floor(segments.length / 2);
-  const labelPos = segments[mid] || { labelX: 0, labelY: 0 };
+  const labelPos = segments[mid] ?? { labelX: 0, labelY: 0 };
 
   // Drag handlers
   const startDrag = (handlerIdx: number) => {
@@ -71,9 +107,7 @@ const PositionableEdge: FC<EdgeProps> = ({
       eds.map(edge => {
         if (edge.id === id) {
           const newPh = (edge.data as any).positionHandlers.map((hh: Handler, idx: number) => ({
-            x: hh.x,
-            y: hh.y,
-            active: idx === handlerIdx,
+            x: hh.x, y: hh.y, active: idx === handlerIdx
           }));
           return { ...edge, data: { ...(edge.data as any), positionHandlers: newPh } };
         }
@@ -101,8 +135,7 @@ const PositionableEdge: FC<EdgeProps> = ({
         eds.map(edge => {
           if (edge.id === id) {
             const ph = (edge.data as any).positionHandlers.map((hh: Handler) => ({
-              x: hh.x,
-              y: hh.y,
+              x: hh.x, y: hh.y
             }));
             return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
           }
@@ -127,7 +160,7 @@ const PositionableEdge: FC<EdgeProps> = ({
           style={ { ...style, stroke: strokeColor, strokeWidth } }
           markerEnd={ markerEnd }
           markerStart={ markerStart }
-          onContextMenu={ (e) => {
+          onContextMenu={ e => {
             e.preventDefault();
             const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
             rf.setEdges(eds =>
@@ -144,7 +177,6 @@ const PositionableEdge: FC<EdgeProps> = ({
         />
       )) }
 
-      {/* render cost label at midpoint of edge */ }
       { cost !== undefined && (
         <EdgeLabelRenderer>
           <div
@@ -165,7 +197,9 @@ const PositionableEdge: FC<EdgeProps> = ({
         <EdgeLabelRenderer key={ `${ id }-handler-${ i }` }>
           <div
             className="positionHandlerContainer"
-            style={ { transform: `translate(${ h.x }px, ${ h.y }px) translate(-50%, -50%)` } }
+            style={ {
+              transform: `translate(${ h.x }px, ${ h.y }px) translate(-50%, -50%)`
+            } }
             onMouseDown={ e => {
               e.stopPropagation();
               startDrag(i);
