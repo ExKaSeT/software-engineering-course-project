@@ -155,10 +155,30 @@ export default function MapCanvas() {
   // Изменение стоимости дороги
   const onEdgeDoubleClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {
-      const cost = prompt('New road cost:', edge.label as string)?.trim();
-      if (!cost || cost === edge.label) return;
+      const input = prompt('New road cost:', edge.label as string);
+      if (input == null) {
+        // пользователь отменил prompt
+        return;
+      }
+      const cost = input.trim();
+      if (!cost || cost === edge.label) {
+        // пустая строка или без изменений
+        return;
+      }
+      // проверяем, что в cost только цифры
+      if (!/^\d+$/.test(cost)) {
+        alert('Cost must contain only digits');
+        return;
+      }
+      const numericCost = Number(cost);
       const next = edges.map(e =>
-        e.id === edge.id ? { ...e, label: cost, data: { ...e.data, cost: Number(cost) } } : e
+        e.id === edge.id
+          ? {
+            ...e,
+            label: cost,
+            data: { ...e.data, cost: numericCost },
+          }
+          : e
       );
       setEdges(next);
       caretakerRef.current.save({ nodes, edges: next });
