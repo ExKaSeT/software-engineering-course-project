@@ -8,10 +8,20 @@ type CityNode = Node<
   'custom'
 >;
 
-const CustomNode: FC<NodeProps<CityNode>> = ({ id, data }) => {
+const CustomNode: FC<NodeProps<CityNode>> = ({ id, data, selected }) => {
   return (
-    <div className="p-2 bg-neutral-200 rounded-xl shadow-card border border-gray-500">
+    <div
+      className={ `
+        p-2
+        bg-neutral-200
+        rounded-xl
+        shadow-card
+        border border-gray-500
+        ${ selected ? 'ring-1 ring-gray-500' : '' }
+      ` }
+    >
       <div className="text-sm font-medium">{ data.label }</div>
+
       {/* 4 стандартных хэндла — по одному на каждую сторону */ }
       <Handle
         type="target"
