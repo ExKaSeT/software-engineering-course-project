@@ -34,7 +34,6 @@ import {
   RenameNodeCommand,
   ChangeEdgeCostCommand,
   MoveNodeCommand,
-  Command,
 } from '@/utils/command';
 import { Caretaker } from '@/utils/caretaker';
 import { genCityName } from '@/utils/nameGenerator';
@@ -54,62 +53,44 @@ export default function MapCanvas() {
   const edgeTypes: EdgeTypes = useMemo(() => ({
     positionable: (props: EdgeProps) => (
       <PositionableEdge
-        {...props}
-        setEdges={setEdges}
-        caretaker={caretakerRef.current}
+        { ...props }
+        setEdges={ setEdges }
+        caretaker={ caretakerRef.current }
       />
     ),
   }), [setEdges]);
 
-  // Мета-команда «Добавить город»
-  const addCityCmd: Command = useMemo(
-    () => ({
-      execute() {
-        const id = Date.now().toString();
-        const name = genCityName(nodes);
-        const cmd = new AddNodeCommand(
-          {
-            id,
-            type: 'custom',
-            data: { label: name },
-            position: {
-              x: 50 + Math.random() * 200,
-              y: 50 + Math.random() * 200,
-            },
-          },
-          setNodes
-        );
-        caretakerRef.current.addCommand(cmd);
+  // Добавить город
+  const handleAddCity = useCallback(() => {
+    const id = Date.now().toString();
+    const name = genCityName(nodes);
+    const cmd = new AddNodeCommand(
+      {
+        id,
+        type: 'custom',
+        data: { label: name },
+        position: {
+          x: 50 + Math.random() * 200,
+          y: 50 + Math.random() * 200,
+        },
       },
-      undo() {
-      },
-      serialize() {
-      },
-    }),
-    [nodes, setNodes]
-  );
+      setNodes
+    );
+    caretakerRef.current.executeCommand(cmd);
+  }, [nodes, setNodes]);
 
-  // Мета-команда «Удалить выбранные»
-  const deleteCmd: Command = useMemo(
-    () => ({
-      execute() {
-        const delNodes = nodes.filter((n) => n.selected);
-        const delEdges = edges.filter((e) => e.selected);
-        const cmd = new DeleteElementsCommand(
-          delNodes,
-          delEdges,
-          setNodes,
-          setEdges
-        );
-        caretakerRef.current.addCommand(cmd);
-      },
-      undo() {
-      },
-      serialize() {
-      },
-    }),
-    [nodes, edges, setNodes, setEdges]
-  );
+  // Удалить выбранные
+  const handleDelete = useCallback(() => {
+    const delNodes = nodes.filter((n) => n.selected);
+    const delEdges = edges.filter((e) => e.selected);
+    const cmd = new DeleteElementsCommand(
+      delNodes,
+      delEdges,
+      setNodes,
+      setEdges
+    );
+    caretakerRef.current.executeCommand(cmd);
+  }, [nodes, edges, setNodes, setEdges]);
 
   // Экспорт/Импорт: скачиваем или загружаем JSON с initialState+history
   const handleExport = useCallback(() => {
@@ -164,7 +145,7 @@ export default function MapCanvas() {
         data: { cost, positionHandlers: [] },
       };
       const cmd = new AddEdgeCommand(edge, setEdges);
-      caretakerRef.current.addCommand(cmd);
+      caretakerRef.current.executeCommand(cmd);
     },
     [setEdges]
   );
@@ -181,7 +162,7 @@ export default function MapCanvas() {
         oldLabel,
         setNodes
       );
-      caretakerRef.current.addCommand(cmd);
+      caretakerRef.current.executeCommand(cmd);
     },
     [setNodes]
   );
@@ -204,7 +185,7 @@ export default function MapCanvas() {
         oldCost,
         setEdges
       );
-      caretakerRef.current.addCommand(cmd);
+      caretakerRef.current.executeCommand(cmd);
     },
     [setEdges]
   );
@@ -225,7 +206,7 @@ export default function MapCanvas() {
       const newPos = { x: node.position.x, y: node.position.y };
       if (oldPos.x !== newPos.x || oldPos.y !== newPos.y) {
         const cmd = new MoveNodeCommand(node.id, oldPos, newPos, setNodes);
-        caretakerRef.current.addCommand(cmd);
+        caretakerRef.current.executeCommand(cmd);
       }
       dragStartPos.current = null;
     },
@@ -242,20 +223,20 @@ export default function MapCanvas() {
         caretakerRef.current.redo();
       }
       if (e.key === 'Delete') {
-        deleteCmd.execute();
+        handleDelete();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [deleteCmd]);
+  }, [handleDelete]);
 
   return (
     <div className="w-screen h-screen bg-neutral-50">
       <Header
         onExport={ handleExport }
         onImport={ handleImport }
-        addCityCmd={ addCityCmd }
-        deleteCmd={ deleteCmd }
+        onAddCity={ handleAddCity }
+        onDelete={ handleDelete }
       />
 
       <div className="pt-16 w-full h-[calc(100vh-4rem)]">

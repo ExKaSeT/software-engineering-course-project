@@ -104,7 +104,7 @@ const PositionableEdge: FC<PositionableEdgeProps> = ({
     const newHandlers = [...handlers];
     newHandlers.splice(idx, 0, { x: pos.x, y: pos.y });
     const cmd = new ModifyHandlersCommand(id, oldHandlers, newHandlers, setEdges);
-    caretaker.addCommand(cmd);
+    caretaker.executeCommand(cmd);
   };
 
   // перемещение метки через команду
@@ -138,7 +138,7 @@ const PositionableEdge: FC<PositionableEdgeProps> = ({
         finalHandlers,
         setEdges
       );
-      caretaker.addCommand(cmd);
+      caretaker.executeCommand(cmd);
 
       window.removeEventListener('mousemove', moveListener);
       window.removeEventListener('mouseup', upListener);
@@ -153,7 +153,7 @@ const PositionableEdge: FC<PositionableEdgeProps> = ({
     e.preventDefault();
     const newHandlers = handlers.filter((_, idx) => idx !== i);
     const cmd = new ModifyHandlersCommand(id, oldHandlers, newHandlers, setEdges);
-    caretaker.addCommand(cmd);
+    caretaker.executeCommand(cmd);
   };
 
   return (

@@ -13,7 +13,7 @@ export class Caretaker {
   private index = -1;
 
   /** Добавить и сразу выполнить новую команду */
-  public addCommand(cmd: Command) {
+  public executeCommand(cmd: Command) {
     // “обрезаем” все будущие команды
     this.commands.splice(this.index + 1);
     cmd.execute();
