@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FC } from 'react';
-import type { EdgeProps } from '@xyflow/react';
+import type { EdgeProps, Edge } from '@xyflow/react';
 import {
   EdgeLabelRenderer,
   getBezierPath,
@@ -12,11 +12,18 @@ import {
 } from '@xyflow/react';
 import ClickableBaseEdge from './ClickableBaseEdge';
 import './PositionableEdge.css';
+import type { Caretaker } from '@/utils/caretaker';
+import { ModifyHandlersCommand } from '@/utils/command';
 
 interface Handler {
   x: number;
   y: number;
   active?: boolean;
+}
+
+interface PositionableEdgeProps extends EdgeProps {
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
+  caretaker: Caretaker;
 }
 
 // Вычисляем направление сегмента по вектору от src к tgt
@@ -33,121 +40,120 @@ function getSegmentPosition(
   }
 }
 
-const PositionableEdge: FC<EdgeProps> = ({
-                                           id,
-                                           selected,
-                                           sourceX,
-                                           sourceY,
-                                           targetX,
-                                           targetY,
-                                           sourcePosition,
-                                           targetPosition,
-                                           style = {},
-                                           markerEnd,
-                                           markerStart,
-                                           data,
-                                         }) => {
+const PositionableEdge: FC<PositionableEdgeProps> = ({
+                                                       id,
+                                                       selected,
+                                                       sourceX, sourceY,
+                                                       targetX, targetY,
+                                                       sourcePosition,
+                                                       targetPosition,
+                                                       style = {},
+                                                       markerEnd,
+                                                       markerStart,
+                                                       data,
+                                                       setEdges,
+                                                       caretaker,
+                                                     }) => {
   const rf = useReactFlow();
-  const handlers = (data as any)?.positionHandlers as Handler[] || [];
-  const type = (data as any)?.type as string || 'bezier';
+  const handlers: Handler[] = (data as any)?.positionHandlers || [];
+  const type = (data as any)?.type || 'bezier';
   const cost = (data as any)?.cost;
 
-  // Цвет и толщина линий
   const strokeColor = '#3A3A3C';
   const strokeWidth = selected ? 2 : 1;
+  const pathFn = type === 'straight'
+    ? getStraightPath
+    : type === 'smoothstep'
+      ? getSmoothStepPath
+      : getBezierPath;
 
-  // Подбираем функцию построения пути
-  const pathFn =
-    type === 'straight'
-      ? getStraightPath
-      : type === 'smoothstep'
-        ? getSmoothStepPath
-        : getBezierPath;
-
-  // Собираем все сегменты, вычисляя для каждого свои позиции
+  // готовим сегменты
   const segments: { path: string; labelX: number; labelY: number }[] = [];
-  const segmentCount = handlers.length + 1;
-  for (let i = 0; i < segmentCount; i++) {
-    const prev = i === 0
+  for (let i = 0; i < handlers.length + 1; i++) {
+    const src = i === 0
       ? { x: sourceX, y: sourceY }
-      : { x: handlers[i - 1].x, y: handlers[i - 1].y };
-    const next = i === segmentCount - 1
+      : handlers[i - 1];
+    const tgt = i === handlers.length
       ? { x: targetX, y: targetY }
-      : { x: handlers[i].x, y: handlers[i].y };
+      : handlers[i];
 
-    const segSourcePos =
-      i === 0
-        ? sourcePosition
-        : getSegmentPosition(prev, next);
-
-    const segTargetPos =
-      i === segmentCount - 1
-        ? targetPosition
-        : getSegmentPosition(next, prev);
+    const srcPos = i === 0
+      ? sourcePosition
+      : getSegmentPosition(src, tgt);
+    const tgtPos = i === handlers.length
+      ? targetPosition
+      : getSegmentPosition(tgt, src);
 
     const [d, lx, ly] = pathFn({
-      sourceX: prev.x,
-      sourceY: prev.y,
-      sourcePosition: segSourcePos,
-      targetX: next.x,
-      targetY: next.y,
-      targetPosition: segTargetPos,
+      sourceX: src.x,
+      sourceY: src.y,
+      sourcePosition: srcPos,
+      targetX: tgt.x,
+      targetY: tgt.y,
+      targetPosition: tgtPos,
     });
-
     segments.push({ path: d, labelX: lx, labelY: ly });
   }
 
-  // Позиция для лейбла цены — середина всего пути
-  const mid = Math.floor(segments.length / 2);
-  const labelPos = segments[mid] ?? { labelX: 0, labelY: 0 };
+  const oldHandlers = JSON.parse(JSON.stringify(handlers)) as Handler[];
 
-  // Drag handlers
-  const startDrag = (handlerIdx: number) => {
-    rf.setEdges(eds =>
-      eds.map(edge => {
-        if (edge.id === id) {
-          const newPh = (edge.data as any).positionHandlers.map((hh: Handler, idx: number) => ({
-            x: hh.x, y: hh.y, active: idx === handlerIdx
-          }));
-          return { ...edge, data: { ...(edge.data as any), positionHandlers: newPh } };
-        }
-        return edge;
-      })
-    );
+  // добавление метки через команду
+  const handleContextMenu = (idx: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const newHandlers = [...handlers];
+    newHandlers.splice(idx, 0, { x: pos.x, y: pos.y });
+    const cmd = new ModifyHandlersCommand(id, oldHandlers, newHandlers, setEdges);
+    caretaker.addCommand(cmd);
+  };
 
-    const onMove = (e: MouseEvent) => {
+  // перемещение метки через команду
+  const startDrag = (i: number) => {
+    let moveListener: any, upListener: any;
+
+    // onMove запоминает новую позицию
+    moveListener = (e: MouseEvent) => {
       const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      rf.setEdges(eds =>
-        eds.map(edge => {
-          if (edge.id === id) {
-            const ph = [...(edge.data as any).positionHandlers];
-            const idx = ph.findIndex((h: Handler) => h.active);
-            if (idx >= 0) ph[idx] = { x: pos.x, y: pos.y, active: true };
-            return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
-          }
-          return edge;
-        })
+      const middle = [...handlers];
+      middle[i] = { x: pos.x, y: pos.y, active: true };
+      // не выполняем команду сразу, откладываем до mouseup
+      handlers[i] = { ...handlers[i], active: true };
+      rf.setEdges((eds) =>
+        eds.map((e) =>
+          e.id === id
+            ? { ...e, data: { ...e.data, positionHandlers: middle } }
+            : e
+        )
       );
     };
 
-    const onUp = () => {
-      rf.setEdges(eds =>
-        eds.map(edge => {
-          if (edge.id === id) {
-            const ph = (edge.data as any).positionHandlers.map((hh: Handler) => ({
-              x: hh.x, y: hh.y
-            }));
-            return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
-          }
-          return edge;
-        })
+    upListener = () => {
+      const edgeItem = rf.getEdges().find(e => e.id === id);
+      // берём либо его data.positionHandlers, либо пустой массив
+      const finalHandlers = (edgeItem?.data?.positionHandlers ?? []) as Handler[];
+      // создаём команду с сохранённым oldHandlers и новым finalHandlers
+      const cmd = new ModifyHandlersCommand(
+        id,
+        oldHandlers,
+        finalHandlers,
+        setEdges
       );
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      caretaker.addCommand(cmd);
+
+      window.removeEventListener('mousemove', moveListener);
+      window.removeEventListener('mouseup', upListener);
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', moveListener);
+    window.addEventListener('mouseup', upListener);
+  };
+
+  // удаление метки через команду
+  const handleRemove = (i: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const newHandlers = handlers.filter((_, idx) => idx !== i);
+    const cmd = new ModifyHandlersCommand(id, oldHandlers, newHandlers, setEdges);
+    caretaker.addCommand(cmd);
   };
 
   return (
@@ -160,31 +166,17 @@ const PositionableEdge: FC<EdgeProps> = ({
           style={ { ...style, stroke: strokeColor, strokeWidth } }
           markerEnd={ markerEnd }
           markerStart={ markerStart }
-          onContextMenu={ e => {
-            e.preventDefault();
-            const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-            rf.setEdges(eds =>
-              eds.map(edge => {
-                if (edge.id === id) {
-                  const ph = [...(edge.data as any).positionHandlers];
-                  ph.splice(idx, 0, { x: pos.x, y: pos.y });
-                  return { ...edge, data: { ...(edge.data as any), positionHandlers: ph } };
-                }
-                return edge;
-              })
-            );
-          } }
+          onContextMenu={ (e) => handleContextMenu(idx, e) }
         />
       )) }
 
-      { cost !== undefined && (
+      { cost != null && (
         <EdgeLabelRenderer>
           <div
             className="px-1 py-0.5 bg-white rounded border shadow-subtle text-sm"
             style={ {
               position: 'absolute',
-              transform: `translate(${ labelPos.labelX }px, ${ labelPos.labelY }px) translate(-50%, -150%)`,
-              whiteSpace: 'nowrap',
+              transform: `translate(${ segments[Math.floor(segments.length / 2)].labelX }px, ${ segments[Math.floor(segments.length / 2)].labelY }px) translate(-50%, -150%)`,
               pointerEvents: 'none',
             } }
           >
@@ -197,31 +189,12 @@ const PositionableEdge: FC<EdgeProps> = ({
         <EdgeLabelRenderer key={ `${ id }-handler-${ i }` }>
           <div
             className="positionHandlerContainer"
-            style={ {
-              transform: `translate(${ h.x }px, ${ h.y }px) translate(-50%, -50%)`
-            } }
-            onMouseDown={ e => {
+            style={ { transform: `translate(${ h.x }px, ${ h.y }px) translate(-50%, -50%)` } }
+            onMouseDown={ (e) => {
               e.stopPropagation();
               startDrag(i);
             } }
-            onContextMenu={ e => {
-              e.preventDefault();
-              e.stopPropagation();
-              rf.setEdges(eds =>
-                eds.map(edge => {
-                  if (edge.id === id) {
-                    const ph = [...(edge.data as any).positionHandlers];
-                    ph.splice(i, 1);
-                    return {
-                      ...edge,
-                      id: `${ id }-${ Date.now() }`,
-                      data: { ...(edge.data as any), positionHandlers: ph },
-                    };
-                  }
-                  return edge;
-                })
-              );
-            } }
+            onContextMenu={ (e) => handleRemove(i, e) }
           >
             <button className="positionHandler"/>
           </div>

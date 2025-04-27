@@ -19,7 +19,7 @@ import {
   Connection,
   NodeTypes,
   EdgeTypes,
-  ConnectionMode,
+  ConnectionMode, EdgeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -39,9 +39,6 @@ import {
 import { Caretaker } from '@/utils/caretaker';
 import { genCityName } from '@/utils/nameGenerator';
 
-const edgeTypes: EdgeTypes = {
-  positionable: PositionableEdge,
-};
 const nodeTypes: NodeTypes = {
   custom: CustomNode,
 };
@@ -53,6 +50,16 @@ export default function MapCanvas() {
 
   // Ref для хранения позиции узла в момент начала перетаскивания
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const edgeTypes: EdgeTypes = useMemo(() => ({
+    positionable: (props: EdgeProps) => (
+      <PositionableEdge
+        {...props}
+        setEdges={setEdges}
+        caretaker={caretakerRef.current}
+      />
+    ),
+  }), [setEdges]);
 
   // Мета-команда «Добавить город»
   const addCityCmd: Command = useMemo(

@@ -215,6 +215,58 @@ export class MoveNodeCommand implements Command {
   }
 }
 
+// — Поменять список handlers у edge —
+export class ModifyHandlersCommand implements Command {
+  constructor(
+    private edgeId: string,
+    private oldHandlers: any[],      // сохранённый массив before
+    private newHandlers: any[],      // массив after
+    private setEdges: EdgeSetter
+  ) {
+  }
+
+  execute() {
+    this.setEdges((eds) =>
+      eds.map((e) =>
+        e.id === this.edgeId
+          ? {
+            ...e,
+            data: {
+              ...e.data,
+              positionHandlers: this.newHandlers,
+            },
+          }
+          : e
+      )
+    );
+  }
+
+  undo() {
+    this.setEdges((eds) =>
+      eds.map((e) =>
+        e.id === this.edgeId
+          ? {
+            ...e,
+            data: {
+              ...e.data,
+              positionHandlers: this.oldHandlers,
+            },
+          }
+          : e
+      )
+    );
+  }
+
+  serialize() {
+    return {
+      type: 'ModifyHandlers',
+      edgeId: this.edgeId,
+      oldHandlers: this.oldHandlers,
+      newHandlers: this.newHandlers,
+    };
+  }
+}
+
 // фабрика для восстановления команд из JSON
 export function deserializeCommand(
   raw: any,
@@ -248,6 +300,13 @@ export function deserializeCommand(
         raw.oldPos,
         raw.newPos,
         setNodes
+      );
+    case 'ModifyHandlers':
+      return new ModifyHandlersCommand(
+        raw.edgeId,
+        raw.oldHandlers,
+        raw.newHandlers,
+        setEdges
       );
     default:
       throw new Error(`Unknown command type "${ raw.type }"`);
