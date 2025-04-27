@@ -48,7 +48,7 @@ export default function MapCanvas() {
   const caretakerRef = useRef(new Caretaker());
 
   // Ref для хранения позиции узла в момент начала перетаскивания
-  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const dragStartPos = useRef<Record<string, { x: number; y: number }>>({});
 
   const edgeTypes: EdgeTypes = useMemo(() => ({
     positionable: (props: EdgeProps) => (
@@ -190,27 +190,50 @@ export default function MapCanvas() {
     [setEdges]
   );
 
-// Перехватываем старт перетаскивания, сохраняем oldPos
+  // Запоминаем позиции всех перетаскиваемых нод
   const onNodeDragStart = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      dragStartPos.current = { x: node.position.x, y: node.position.y };
+    (_evt: React.MouseEvent, node: Node) => {
+      // определяем, какие ноды двигаются:
+      // если тащим выбранную группу, то все selected; иначе только текущую
+      const movingIds = node.selected
+        ? nodes.filter((n) => n.selected).map((n) => n.id)
+        : [node.id];
+
+      // сохраняем их текущие позиции
+      const startPositions: Record<string, { x: number; y: number }> = {};
+      nodes.forEach((n) => {
+        if (movingIds.includes(n.id)) {
+          startPositions[n.id] = { x: n.position.x, y: n.position.y };
+        }
+      });
+      dragStartPos.current = startPositions;
     },
-    []
+    [nodes]
   );
 
-  // Перетаскивание закончено — если сместился, создаём MoveNodeCommand
+  // Создаём MoveNodeCommand для каждой ноды, чья позиция изменилась
   const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      const oldPos = dragStartPos.current;
-      if (!oldPos) return;
-      const newPos = { x: node.position.x, y: node.position.y };
-      if (oldPos.x !== newPos.x || oldPos.y !== newPos.y) {
-        const cmd = new MoveNodeCommand(node.id, oldPos, newPos, setNodes);
-        caretakerRef.current.executeCommand(cmd);
-      }
-      dragStartPos.current = null;
+    (_evt: React.MouseEvent, _node: Node) => {
+      const startPositions = dragStartPos.current;
+      if (!startPositions) return;
+
+      Object.entries(startPositions).forEach(([id, oldPos]) => {
+        // на момент стопа все позиции уже записаны в nodes
+        const movedNode = nodes.find((n) => n.id === id);
+        if (!movedNode) return;
+
+        const newPos = { x: movedNode.position.x, y: movedNode.position.y };
+        // если действительно сместилось
+        if (oldPos.x !== newPos.x || oldPos.y !== newPos.y) {
+          const cmd = new MoveNodeCommand(id, oldPos, newPos, setNodes);
+          caretakerRef.current.executeCommand(cmd);
+        }
+      });
+
+      // чистим, чтобы не мешало следующему drag
+      dragStartPos.current = {};
     },
-    [setNodes]
+    [nodes, setNodes]
   );
 
   // Хоткеи undo/redo/delete
