@@ -155,7 +155,13 @@ export default function MapCanvas() {
     (_: React.MouseEvent, node: Node) => {
       const oldLabel = node.data.label as string;
       const newLabel = prompt('New city name:', oldLabel)?.trim();
-      if (!newLabel || newLabel === oldLabel) return;
+      if (!newLabel || newLabel === oldLabel) {
+        return;
+      }
+      if (nodes.some((n) => n.data.label === newLabel)) {
+        alert('Name must be unique');
+        return;
+      }
       const cmd = new RenameNodeCommand(
         node.id,
         newLabel,
@@ -164,7 +170,7 @@ export default function MapCanvas() {
       );
       caretakerRef.current.executeCommand(cmd);
     },
-    [setNodes]
+    [nodes, setNodes]
   );
 
   // Изменение стоимости ребра
