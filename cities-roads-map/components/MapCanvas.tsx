@@ -33,6 +33,7 @@ import {
   AddEdgeCommand,
   RenameNodeCommand,
   ChangeEdgeCostCommand,
+  MoveNodeCommand,
   Command,
 } from '@/utils/command';
 import { Caretaker } from '@/utils/caretaker';
@@ -50,7 +51,10 @@ export default function MapCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const caretakerRef = useRef(new Caretaker());
 
-  // 1) Мета-команда «Добавить город»
+  // Ref для хранения позиции узла в момент начала перетаскивания
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  // Мета-команда «Добавить город»
   const addCityCmd: Command = useMemo(
     () => ({
       execute() {
@@ -61,19 +65,24 @@ export default function MapCanvas() {
             id,
             type: 'custom',
             data: { label: name },
-            position: { x: 50 + Math.random() * 200, y: 50 + Math.random() * 200 }
+            position: {
+              x: 50 + Math.random() * 200,
+              y: 50 + Math.random() * 200,
+            },
           },
           setNodes
         );
         caretakerRef.current.addCommand(cmd);
       },
-      undo() {},
-      serialize() {},
+      undo() {
+      },
+      serialize() {
+      },
     }),
     [nodes, setNodes]
   );
 
-  // 2) Мета-команда «Удалить выбранные»
+  // Мета-команда «Удалить выбранные»
   const deleteCmd: Command = useMemo(
     () => ({
       execute() {
@@ -87,8 +96,10 @@ export default function MapCanvas() {
         );
         caretakerRef.current.addCommand(cmd);
       },
-      undo() {},
-      serialize() {},
+      undo() {
+      },
+      serialize() {
+      },
     }),
     [nodes, edges, setNodes, setEdges]
   );
@@ -96,7 +107,6 @@ export default function MapCanvas() {
   // Экспорт/Импорт: скачиваем или загружаем JSON с initialState+history
   const handleExport = useCallback(() => {
     const payload = {
-      // initialState: { nodes, edges },
       history: caretakerRef.current.export(),
     };
     const blob = new Blob([JSON.stringify(payload)], {
@@ -118,10 +128,6 @@ export default function MapCanvas() {
       reader.onload = () => {
         try {
           const payload = JSON.parse(reader.result as string);
-          // 1) Восстанавливаем «чистые» nodes/edges
-          // setNodes(payload.initialState.nodes);
-          // setEdges(payload.initialState.edges);
-          // 2) Импортируем историю в caretaker, затем реплейим все команды
           caretakerRef.current.import(
             payload.history,
             setNodes,
@@ -137,7 +143,7 @@ export default function MapCanvas() {
     [setNodes, setEdges]
   );
 
-  // Остальной функционал через команды
+  // Добавление ребра
   const onConnect = useCallback(
     (params: Connection) => {
       const costStr = prompt('Enter road cost:', '1');
@@ -156,6 +162,7 @@ export default function MapCanvas() {
     [setEdges]
   );
 
+  // Переименование узла
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const oldLabel = node.data.label as string;
@@ -172,6 +179,7 @@ export default function MapCanvas() {
     [setNodes]
   );
 
+  // Изменение стоимости ребра
   const onEdgeDoubleClick = useCallback(
     (_: React.MouseEvent, edge: Edge) => {
       const oldCost = edge.data?.cost as number;
@@ -194,9 +202,32 @@ export default function MapCanvas() {
     [setEdges]
   );
 
+// Перехватываем старт перетаскивания, сохраняем oldPos
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      dragStartPos.current = { x: node.position.x, y: node.position.y };
+    },
+    []
+  );
+
+  // Перетаскивание закончено — если сместился, создаём MoveNodeCommand
+  const onNodeDragStop = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      const oldPos = dragStartPos.current;
+      if (!oldPos) return;
+      const newPos = { x: node.position.x, y: node.position.y };
+      if (oldPos.x !== newPos.x || oldPos.y !== newPos.y) {
+        const cmd = new MoveNodeCommand(node.id, oldPos, newPos, setNodes);
+        caretakerRef.current.addCommand(cmd);
+      }
+      dragStartPos.current = null;
+    },
+    [setNodes]
+  );
+
   // Хоткеи undo/redo/delete
   useEffect(() => {
-    const h = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         caretakerRef.current.undo();
       }
@@ -207,8 +238,8 @@ export default function MapCanvas() {
         deleteCmd.execute();
       }
     };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [deleteCmd]);
 
   return (
@@ -229,6 +260,8 @@ export default function MapCanvas() {
           onConnect={ onConnect }
           onNodeDoubleClick={ onNodeDoubleClick }
           onEdgeDoubleClick={ onEdgeDoubleClick }
+          onNodeDragStart={ onNodeDragStart }
+          onNodeDragStop={ onNodeDragStop }
           nodeTypes={ nodeTypes }
           edgeTypes={ edgeTypes }
           connectionMode={ ConnectionMode.Loose }

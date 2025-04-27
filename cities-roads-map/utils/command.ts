@@ -175,6 +175,46 @@ export class ChangeEdgeCostCommand implements Command {
   }
 }
 
+// — Перемещение узла —
+export class MoveNodeCommand implements Command {
+  constructor(
+    private nodeId: string,
+    private oldPos: { x: number; y: number },
+    private newPos: { x: number; y: number },
+    private setNodes: NodeSetter
+  ) {
+  }
+
+  execute() {
+    this.setNodes((nds) =>
+      nds.map((n) =>
+        n.id === this.nodeId
+          ? { ...n, position: { x: this.newPos.x, y: this.newPos.y } }
+          : n
+      )
+    );
+  }
+
+  undo() {
+    this.setNodes((nds) =>
+      nds.map((n) =>
+        n.id === this.nodeId
+          ? { ...n, position: { x: this.oldPos.x, y: this.oldPos.y } }
+          : n
+      )
+    );
+  }
+
+  serialize() {
+    return {
+      type: 'MoveNode',
+      nodeId: this.nodeId,
+      oldPos: this.oldPos,
+      newPos: this.newPos,
+    };
+  }
+}
+
 // фабрика для восстановления команд из JSON
 export function deserializeCommand(
   raw: any,
@@ -201,6 +241,13 @@ export function deserializeCommand(
         raw.newCost,
         raw.oldCost,
         setEdges
+      );
+    case 'MoveNode':
+      return new MoveNodeCommand(
+        raw.nodeId,
+        raw.oldPos,
+        raw.newPos,
+        setNodes
       );
     default:
       throw new Error(`Unknown command type "${ raw.type }"`);
