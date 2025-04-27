@@ -42,7 +42,6 @@ export default function MapCanvas() {
   // Инициализация истории
   useEffect(() => {
     caretakerRef.current.save({ nodes, edges });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Добавить город
@@ -54,8 +53,8 @@ export default function MapCanvas() {
       type: 'custom',
       data: { label: name },
       position: {
-        x: 50 + Math.random() * 400,
-        y: 50 + Math.random() * 400,
+        x: 50 + Math.random() * 200,
+        y: 50 + Math.random() * 200,
       },
     };
     const next = [...nodes, newNode];

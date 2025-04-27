@@ -10,8 +10,8 @@ export class Memento {
 
   getState(): FlowState {
     return {
-      nodes: JSON.parse(JSON.stringify(this.state.nodes)),
-      edges: JSON.parse(JSON.stringify(this.state.edges)),
+      nodes: this.state.nodes,
+      edges: this.state.edges
     };
   }
 }
