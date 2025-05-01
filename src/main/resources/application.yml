@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: postgres
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/mongo
+    redis:
+      host: localhost
+      port: 6379
+      password: redis
+      uri: redis://localhost:6379
+
+  cache:
+    type: redis
+    cache-names: redis-cache
+    redis:
+      time-to-live: 30000
+
+  messages:
+    basename: i18n/messages
+
+  #liquibase
+  liquibase.change-log: classpath:/db/changelog/db-changelog.xml
+
+
+minio:
+  datasource:
+    username: minioadmin
+    password: minioadmin
+    url: http://127.0.0.1:9000
+  bucket-name: data

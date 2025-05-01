@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2024-02-26-create-images-table" author="admin">
+        <createTable tableName="images">
+            <column name="name" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="size" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="link" type="varchar(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+        </createTable>
+
+        <createTable tableName="messages_images">
+            <column name="message_id" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+            <column name="image_link" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addPrimaryKey columnNames="message_id, image_link"
+                       constraintName="messages_images_pk"
+                       tableName="messages_images"/>
+
+        <addForeignKeyConstraint baseColumnNames="message_id"
+                                 baseTableName="messages_images"
+                                 constraintName="messages_images_messages_fk"
+                                 referencedColumnNames="id"
+                                 referencedTableName="messages"/>
+
+        <addForeignKeyConstraint baseColumnNames="image_link"
+                                 baseTableName="messages_images"
+                                 constraintName="messages_images_images_fk"
+                                 referencedColumnNames="link"
+                                 referencedTableName="images"/>
+    </changeSet>
+</databaseChangeLog>
