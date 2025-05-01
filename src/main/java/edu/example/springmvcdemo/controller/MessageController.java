@@ -19,6 +19,11 @@ public class MessageController {
         return messageService.getMessage(id);
     }
 
+    @DeleteMapping("/{id}")
+    public void deleteMessageById(@PathVariable Long id) {
+        messageService.deleteMessage(id);
+    }
+
     @PostMapping
     public MessageDto sendMessage(@RequestPart("message") String content,
                                @RequestPart(value = "files", required = false) List<MultipartFile> files) {

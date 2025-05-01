@@ -10,6 +10,8 @@ import edu.example.springmvcdemo.model.Image;
 import edu.example.springmvcdemo.model.Message;
 import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +23,7 @@ import static edu.example.springmvcdemo.model.Operation.OperationType.WRITE;
 import static java.util.Objects.nonNull;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class MessageService {
 
@@ -78,5 +81,23 @@ public class MessageService {
         operationService.logOperation(WRITE, "Create message with id " + message.getId());
 
         return messageMapper.toMessageDto(message);
+    }
+
+    @CacheEvict(value = "MessageService::getMessage", key = "#id")
+    public void deleteMessage(Long id) {
+        Message message = messageRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Message not found"));
+
+        for (Image img : message.getImages()) {
+            try {
+                minioRepository.deleteObject(img.getLink());
+            } catch (FileWriteException e) {
+                log.warn("Failed to delete object from MinIO: {}", img.getLink(), e);
+            }
+        }
+
+        messageRepository.delete(message);
+
+        operationService.logOperation(WRITE, "Deleted message with id " + id);
     }
 }
